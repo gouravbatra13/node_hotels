@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const mongoURL = "mongodb://127.0.0.1:27017/hotels";
 
+// const mongoURL = "mongodb+srv://HelloGourav:HelloGourav12@cluster0.tlmydyn.mongodb.net/";
+
 /**connection create */
 mongoose.connect(mongoURL,{
     // useNewUrlParser:true,
