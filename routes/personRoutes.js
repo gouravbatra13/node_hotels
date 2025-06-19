@@ -3,16 +3,34 @@ const router = express.Router();
 /**import model */
 const Person = require('../models/Person');
 
+/**import jwt */
+const {
+    jwtAuthMiddleware,
+    generateToken
+} = require('./../jwt');
+
 /**save person */
-router.post('/', async (req, res) => {
+router.post('/signup', async (req, res) => {
     try {
         const data = req.body;
         // Capitalized model name (assuming you imported it as 'Person')
         const newPerson = new Person(data);
 
-        const saveData = await newPerson.save();
+        const response = await newPerson.save();
         console.log('Data saved');
-        res.status(200).json(saveData);
+
+        const payload = {
+            id: response.id,
+            username: response.username,
+        }
+        const token = generateToken(payload);
+        console.log('token', token);
+
+
+        res.status(200).json({
+            response: response,
+            token: token
+        });
     } catch (error) {
         console.error('Error saving person:', error);
         // res.status(500).json({ error: 'Internal server error' });
@@ -23,8 +41,51 @@ router.post('/', async (req, res) => {
 });
 
 
+/**
+ * login
+ */
+
+router.post('/login', async (req, res) => {
+    try {
+        const {
+            username,
+            password
+        } = req.body;
+
+        const user = await Person.findOne({
+            username: username
+        });
+
+        if (!user || !(await user.comparePassword(password))) {
+            return res.status(401).json({
+                error: 'Invalid username or password'
+            });
+        }
+
+        /**
+         * generate token
+         */
+        const payload = {
+            id: user.id,
+            username: user.username
+        };
+        const token = generateToken(payload);
+        console.log('token', token);
+
+        res.status(200).json({
+            token: token,
+            response: user
+        })
+    } catch (error) {
+        res.status(500).json({
+            error: error,
+        })
+    }
+})
+
+
 /** get all person */
-router.get('/', async (req, res) => {
+router.get('/', jwtAuthMiddleware, async (req, res) => {
     try {
         const data = await Person.find();
         res.status(200).json(data);
@@ -37,6 +98,27 @@ router.get('/', async (req, res) => {
     }
 })
 
+
+/**Profile route */
+router.get('/profile', jwtAuthMiddleware, async (req, res) => {
+    try {
+        //req.user is in jwt token in jwt.js
+        const userData = req.user;
+        const userId = userData.id;
+        const user = await Person.findOne({
+            _id: userId
+        });
+        res.status(200).json({
+            response: user
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            error: error
+        });
+
+    }
+})
 
 /** get one person by id */
 router.get('/:id', async (req, res) => {
@@ -130,11 +212,11 @@ router.put('/:id', async (req, res) => {
 /**
  * delete
  */
-router.delete('/:id',async(req,res)=>{
+router.delete('/:id', async (req, res) => {
     try {
-        
-         const personId = req.params.id;
-         const response = await Person.findByIdAndDelete(personId);
+
+        const personId = req.params.id;
+        const response = await Person.findByIdAndDelete(personId);
 
         if (!response) {
             res.status(404).json({
